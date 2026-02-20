@@ -9,6 +9,7 @@ key_path = os.path.normpath(os.path.join(base_path, './keys/ServiceKey_GoogleClo
 os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = key_path
 
 storage_client = storage.Client()
+bq_client = bigquery.Client()
 
 bucket_name = "bucket_dicom-fastapi-server"
 
@@ -62,7 +63,7 @@ def transfer_instance_to_bucket(sop_instance_uid, bucket_name):
     return
 
 def get_idc_location(sop_instance_uid) -> tuple[str | None, str | None]:
-    bq_client = bigquery.Client()
+    
     query = f"""
         SELECT gcs_url 
         FROM `bigquery-public-data.idc_current.dicom_all` 
@@ -114,6 +115,17 @@ def get_bytes(blob_name, bucket_name):
     blob = bucket.blob(blob_name)
     dicom_bytes = blob.download_as_bytes()
     return dicom_bytes
+
+def pixel_array_to_png_bytes(pixel_array) -> bytes:
+    img = Image.fromarray(pixel_array)
+    buffer = BytesIO()
+    img.save(buffer, format="PNG")
+    return buffer.getvalue()
+
+def upload_png_bytes(png_bytes: bytes, blob_name: str, bucket_name: str):
+    bucket = storage_client.bucket(bucket_name)
+    blob = bucket.blob(blob_name)
+    blob.upload_from_string(png_bytes, content_type="image/png")
 
 if __name__ == "__main__":
     #upload_to_bucket("testFolder/testBlob", "/home/ksgre/repos/dicom-fastapi-server/imgdisplay_testcases/cplx_p01.dcm", "bucket_dicom-fastapi-server")
